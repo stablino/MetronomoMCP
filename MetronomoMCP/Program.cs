@@ -2,6 +2,7 @@ using MetronomoMCP.Configuration;
 using MetronomoMCP.Data;
 using MetronomoMCP.Data.Abstractions;
 using MetronomoMCP.Resources;
+using MetronomoMCP.Startup;
 using MetronomoMCP.Tools;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +41,12 @@ try
         .AddOptions<McpOptions>()
         .BindConfiguration(McpOptions.SectionName);
 
+    builder.Services
+        .AddOptions<OllamaOptions>()
+        .BindConfiguration(OllamaOptions.SectionName);
+
+    builder.Services.AddSingleton<OllamaStartupChecker>();
+
     // Repository
     builder.Services.AddSingleton<IQueryRepository, SqlQueryRepository>();
 
@@ -51,6 +58,9 @@ try
         .WithResourcesFromAssembly();
 
     var app = builder.Build();
+
+    // Verifica Ollama (se abilitato)
+    await app.Services.GetRequiredService<OllamaStartupChecker>().CheckAsync();
 
     // Test connessione database all'avvio
     var dbOptions = app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
