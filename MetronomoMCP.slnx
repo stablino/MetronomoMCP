@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MetronomoMCP/MetronomoMCP.csproj" />
+  <Project Path="MetronomoMCP.Tests/MetronomoMCP.Tests.csproj" />
+</Solution>

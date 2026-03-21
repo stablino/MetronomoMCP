@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>13</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisMode>All</AnalysisMode>
+    <AssemblyName>MetronomoMCP</AssemblyName>
+    <RootNamespace>MetronomoMCP</RootNamespace>
+    <!-- CA1515: types are referenced by test project via ProjectReference -->
+    <!-- CA1031: intentional broad catch in tool handlers to surface errors to LLM -->
+    <!-- CA2007: console app / MCP server, no SynchronizationContext issues -->
+    <!-- CA1848/CA1873: acceptable perf trade-off for this project size -->
+    <!-- CA1849: IsDBNull is synchronous but safe in this context -->
+    <!-- CA1305: string formatting in MCP responses not locale-sensitive -->
+    <!-- CA2100: SQL passes through SqlReadOnlyValidator; DB user has db_datareader only -->
+    <NoWarn>CA1515;CA1031;CA2007;CA1848;CA1873;CA1849;CA1305;CA2100</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\context.md" CopyToOutputDirectory="PreserveNewest" Link="context.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="*" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="*" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="*" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="*" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="*" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="*" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="*" />
+    <PackageReference Include="Serilog.Sinks.File" Version="*" />
+  </ItemGroup>
+</Project>
