@@ -50,7 +50,7 @@ try
     // Repository
     builder.Services.AddSingleton<IQueryRepository, SqlQueryRepository>();
 
-    // MCP Server — trasporto stdio (compatibile Claude Desktop e Ollama)
+    // MCP Server — trasporto stdio (compatibile Claude Desktop)
     builder.Services
         .AddMcpServer()
         .WithStdioServerTransport()

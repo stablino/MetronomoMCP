@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="MetronomoMCP/MetronomoMCP.csproj" />
   <Project Path="MetronomoMCP.Tests/MetronomoMCP.Tests.csproj" />
+  <Project Path="OllamaChatter/OllamaChatter.csproj" />
 </Solution>
