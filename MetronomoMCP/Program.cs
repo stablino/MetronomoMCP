@@ -24,7 +24,7 @@ try
     // (evita problemi quando Claude Desktop lancia il processo da working directory diversa)
     Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
-    var builder = Host.CreateApplicationBuilder(args);
+    var builder = WebApplication.CreateBuilder(args);
 
     // Serilog
     builder.Services.AddSerilog((services, config) =>
@@ -53,11 +53,23 @@ try
     // MCP Server — trasporto stdio (compatibile Claude Desktop)
     builder.Services
         .AddMcpServer()
-        .WithStdioServerTransport()
+        .WithHttpTransport()
         .WithToolsFromAssembly()
         .WithResourcesFromAssembly();
 
     var app = builder.Build();
+
+    app.MapMcp("/mcp").AllowAnonymous();
+    app.MapGet("/healthz", () => "MetronomoMCP OK").AllowAnonymous();
+
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        foreach (var url in app.Urls)
+        {
+            Log.Information("MetronomoMCP in ascolto su {Url}/mcp", url);
+            Log.Information("Diagnostica disponibile su {Url}/healthz", url);
+        }
+    });
 
     // Verifica Ollama (se abilitato)
     await app.Services.GetRequiredService<OllamaStartupChecker>().CheckAsync();

@@ -1,8 +1,8 @@
-# Contesto Business — Database MM_PR_MECMATICA_AN
+# Contesto Business — Database MM_PR_*
 
 ## Sistema
 
-**Mecmatica** è un ERP italiano per la gestione della produzione manifatturiera (make-to-order / make-to-stock). Il database esposto tramite MetronomoMCP è quello di produzione aziendale su **SQL Server 2025**.
+**Mecmatica** è un ERP italiano per la gestione della produzione manifatturiera (make-to-order / make-to-stock). Il database esposto tramite MetronomoMCP è un database di produzione aziendale su **SQL Server**, il cui nome inizia sempre con il prefisso `MM_PR_`.
 
 Il database contiene centinaia di tabelle raggruppabili in moduli funzionali distinti.
 

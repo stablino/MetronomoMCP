@@ -14,12 +14,14 @@ var config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: false)
     .Build();
 
-var ollamaHost   = config["OllamaHost"] ?? "http://localhost:11434";
-var mcpCommand   = config["MetronomoMCP:Command"] ?? "dotnet";
-var mcpArgs      = config.GetSection("MetronomoMCP:Arguments").Get<string[]>()
-                   ?? (string[])["run", "--project", "../MetronomoMCP"];
-var systemPrompt = config["SystemPrompt"]
-                   ?? "Sei un assistente con accesso a un database SQL Server tramite MetronomoMCP.";
+var ollamaHost        = config["OllamaHost"] ?? "http://localhost:11434";
+var mcpUrl            = config["MetronomoMCP:Url"] ?? "http://localhost:5100/mcp";
+var startupDelaySec   = int.TryParse(config["MetronomoMCP:StartupDelaySeconds"], out var d) ? d : 0;
+var systemPrompt      = config["SystemPrompt"]
+                        ?? "Sei un assistente con accesso a un database SQL Server tramite MetronomoMCP.";
+
+var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
 // ── Banner ─────────────────────────────────────────────────────────────────────
 Console.WriteLine();
@@ -28,24 +30,52 @@ Console.WriteLine("  ║     OllamaChatter + MetronomoMCP tools       ║");
 Console.WriteLine("  ╚══════════════════════════════════════════════╝");
 Console.WriteLine();
 
-// ── MCP Client → MetronomoMCP ──────────────────────────────────────────────────
-Console.Write("  Avvio MetronomoMCP... ");
-await using var mcpClient = await McpClient.CreateAsync(
-    new StdioClientTransport(
-        new StdioClientTransportOptions
-        {
-            Command         = mcpCommand,
-            Arguments       = mcpArgs,
-            Name            = "MetronomoMCP",
-            WorkingDirectory = Directory.GetCurrentDirectory(),
-        },
-        NullLoggerFactory.Instance),
-    new McpClientOptions
+// ── Attesa avvio MetronomoMCP ──────────────────────────────────────────────────
+if (startupDelaySec > 0)
+{
+    for (var i = startupDelaySec; i > 0; i--)
     {
-        ClientInfo = new Implementation { Name = "OllamaChatter", Version = "1.0.0" }
-    },
-    NullLoggerFactory.Instance);
-Console.WriteLine("OK");
+        Console.Write($"\r  Attesa avvio MetronomoMCP... {i,2} s ");
+        await Task.Delay(1000, cts.Token);
+    }
+    Console.WriteLine("\r  Attesa avvio MetronomoMCP... OK   ");
+}
+
+// ── MCP Client → MetronomoMCP (con retry) ─────────────────────────────────────
+McpClient mcpClient;
+while (true)
+{
+    Console.Write($"  Connessione a MetronomoMCP ({mcpUrl})... ");
+    try
+    {
+        mcpClient = await McpClient.CreateAsync(
+            new HttpClientTransport(
+                new HttpClientTransportOptions
+                {
+                    Endpoint      = new Uri(mcpUrl),
+                    Name          = "MetronomoMCP",
+                    TransportMode = HttpTransportMode.StreamableHttp,
+                },
+                NullLoggerFactory.Instance),
+            new McpClientOptions
+            {
+                ClientInfo = new Implementation { Name = "OllamaChatter", Version = "1.0.0" }
+            },
+            NullLoggerFactory.Instance);
+        Console.WriteLine("OK");
+        break;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("ERRORE");
+        Console.WriteLine($"  {ex.Message}");
+        Console.Write("  Riprovare? [s/n] ");
+        if (!string.Equals(Console.ReadLine()?.Trim(), "s", StringComparison.OrdinalIgnoreCase))
+            return 1;
+        Console.WriteLine();
+    }
+}
+await using var _ = mcpClient;
 
 // ── Tool discovery ─────────────────────────────────────────────────────────────
 var mcpTools = await mcpClient.ListToolsAsync();
@@ -60,6 +90,30 @@ var oaiTools = mcpTools
         t.Description ?? string.Empty,
         t.ProtocolTool.InputSchema)))
     .ToList();
+
+// ── Caricamento contesto da MetronomoMCP ───────────────────────────────────────
+Console.Write("  Caricamento contesto business... ");
+try
+{
+    var resource = await mcpClient.ReadResourceAsync("context://business");
+    var contextText = string.Join("\n", resource.Contents
+        .OfType<TextResourceContents>()
+        .Select(c => c.Text));
+
+    if (!string.IsNullOrWhiteSpace(contextText))
+    {
+        systemPrompt += $"\n\n---\n\n{contextText}";
+        Console.WriteLine("OK");
+    }
+    else
+    {
+        Console.WriteLine("vuoto");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"non disponibile ({ex.Message})");
+}
 
 // ── Ollama ─────────────────────────────────────────────────────────────────────
 using var http = new HttpClient { BaseAddress = new Uri(ollamaHost) };
@@ -118,9 +172,6 @@ Console.WriteLine("  'clear' = nuova conversazione  |  'exit' = esci");
 Console.WriteLine(new string('─', 60));
 
 var messages = new List<OAIMessage> { OAIMessage.FromSystem(systemPrompt) };
-var cts = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-
 while (!cts.Token.IsCancellationRequested)
 {
     Console.WriteLine();
