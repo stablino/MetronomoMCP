@@ -22,6 +22,7 @@
   <ItemGroup>
     <!-- appsettings.json e appsettings.Development.json sono inclusi automaticamente da Microsoft.NET.Sdk.Web -->
     <Content Include="..\context.md" CopyToOutputDirectory="PreserveNewest" Link="context.md" />
+    <Content Include="..\context-planning.md" CopyToOutputDirectory="PreserveNewest" Link="context-planning.md" />
   </ItemGroup>
 
   <ItemGroup>

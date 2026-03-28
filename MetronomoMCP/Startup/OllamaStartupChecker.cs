@@ -57,6 +57,10 @@ public sealed class OllamaStartupChecker(
         {
             logger.LogWarning("Ollama non raggiungibile su {BaseUrl}: {Message}", _options.BaseUrl, ex.Message);
         }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Risposta inattesa da Ollama su {BaseUrl}: {Message}", _options.BaseUrl, ex.Message);
+        }
     }
 
     private static string FormatSize(long bytes) =>

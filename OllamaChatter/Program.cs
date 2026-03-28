@@ -2,6 +2,7 @@
 
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,6 +18,10 @@ var config = new ConfigurationBuilder()
 var ollamaHost        = config["OllamaHost"] ?? "http://localhost:11434";
 var mcpUrl            = config["MetronomoMCP:Url"] ?? "http://localhost:5100/mcp";
 var startupDelaySec   = int.TryParse(config["MetronomoMCP:StartupDelaySeconds"], out var d) ? d : 0;
+var defaultModel      = config["DefaultModel"] ?? string.Empty;
+var llmTemperature    = double.TryParse(config["LlmParameters:Temperature"], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var lt) ? lt : 0.0;
+var llmTopP           = double.TryParse(config["LlmParameters:TopP"],         System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var lp) ? lp : 0.1;
+var llmNumCtx         = int.TryParse(config["LlmParameters:NumCtx"],          out var lc) ? lc : 0;
 var systemPrompt      = config["SystemPrompt"]
                         ?? "Sei un assistente con accesso a un database SQL Server tramite MetronomoMCP.";
 
@@ -142,26 +147,40 @@ if (ollamaModels.Count == 0)
 
 // ── Selezione modello ──────────────────────────────────────────────────────────
 string selectedModel;
-if (ollamaModels.Count == 1)
+var configuredModel = defaultModel.Trim();
+var modelNames = ollamaModels.Select(m => m.Name).ToList();
+if (!string.IsNullOrEmpty(configuredModel) &&
+    modelNames.Contains(configuredModel, StringComparer.OrdinalIgnoreCase))
 {
-    selectedModel = ollamaModels[0].Name;
-    Console.WriteLine($"  Modello: {selectedModel}");
+    selectedModel = modelNames.First(m => m.Equals(configuredModel, StringComparison.OrdinalIgnoreCase));
+    Console.WriteLine($"  Modello: {selectedModel} (da configurazione)");
 }
 else
 {
-    Console.WriteLine($"\n  Modelli disponibili ({ollamaModels.Count}):");
-    for (var i = 0; i < ollamaModels.Count; i++)
-        Console.WriteLine($"    [{i + 1}] {ollamaModels[i].Name}  ({FormatSize(ollamaModels[i].Size)})");
+    if (!string.IsNullOrEmpty(configuredModel))
+        Console.WriteLine($"  [AVVISO] Modello configurato '{configuredModel}' non disponibile — seleziona manualmente.");
 
-    int choice;
-    while (true)
+    if (ollamaModels.Count == 1)
     {
-        Console.Write("\n  Seleziona modello: ");
-        var inp = Console.ReadLine()?.Trim();
-        if (int.TryParse(inp, out choice) && choice >= 1 && choice <= ollamaModels.Count) break;
-        Console.WriteLine("  Scelta non valida.");
+        selectedModel = ollamaModels[0].Name;
+        Console.WriteLine($"  Modello: {selectedModel}");
     }
-    selectedModel = ollamaModels[choice - 1].Name;
+    else
+    {
+        Console.WriteLine($"\n  Modelli disponibili ({ollamaModels.Count}):");
+        for (var i = 0; i < ollamaModels.Count; i++)
+            Console.WriteLine($"    [{i + 1}] {ollamaModels[i].Name}  ({FormatSize(ollamaModels[i].Size)})");
+
+        int choice;
+        while (true)
+        {
+            Console.Write("\n  Seleziona modello: ");
+            var inp = Console.ReadLine()?.Trim();
+            if (int.TryParse(inp, out choice) && choice >= 1 && choice <= ollamaModels.Count) break;
+            Console.WriteLine("  Scelta non valida.");
+        }
+        selectedModel = ollamaModels[choice - 1].Name;
+    }
 }
 
 // ── REPL ───────────────────────────────────────────────────────────────────────
@@ -194,7 +213,7 @@ while (!cts.Token.IsCancellationRequested)
         // ── Tool-calling loop ───────────────────────────────────────────────────
         while (!cts.Token.IsCancellationRequested)
         {
-            var reqBody = new { model = selectedModel, messages, tools = oaiTools, stream = false };
+            var reqBody = BuildRequest(selectedModel, messages, oaiTools, llmTemperature, llmTopP, llmNumCtx);
             using var httpResp = await http.PostAsJsonAsync(
                 new Uri("/v1/chat/completions", UriKind.Relative), reqBody, cts.Token);
             httpResp.EnsureSuccessStatusCode();
@@ -251,6 +270,28 @@ Console.WriteLine("\n  Arrivederci.");
 return 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+static JsonObject BuildRequest(
+    string model,
+    List<OAIMessage> messages,
+    List<OAITool> tools,
+    double temperature,
+    double topP,
+    int numCtx)
+{
+    var obj = new JsonObject
+    {
+        ["model"]       = model,
+        ["messages"]    = JsonSerializer.SerializeToNode(messages),
+        ["tools"]       = JsonSerializer.SerializeToNode(tools),
+        ["stream"]      = false,
+        ["temperature"] = temperature,
+        ["top_p"]       = topP,
+    };
+    if (numCtx > 0)
+        obj["num_ctx"] = numCtx;
+    return obj;
+}
 
 static IReadOnlyDictionary<string, object?> ParseArgs(string json)
 {

@@ -18,65 +18,85 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    //Log.Information("Avvio MetronomoMCP...");
-
     // Forza la working directory alla directory dell'eseguibile
     // (evita problemi quando Claude Desktop lancia il processo da working directory diversa)
     Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
-    var builder = WebApplication.CreateBuilder(args);
+    // Leggi il TransportMode prima di costruire l'host, per scegliere il builder corretto
+    var prelimConfig = new ConfigurationBuilder()
+        .SetBasePath(AppContext.BaseDirectory)
+        .AddJsonFile("appsettings.json", optional: false)
+        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+        .AddCommandLine(args)
+        .Build();
 
-    // Serilog
-    builder.Services.AddSerilog((services, config) =>
-        config.ReadFrom.Configuration(builder.Configuration));
+    var transportMode = prelimConfig[$"{McpOptions.SectionName}:TransportMode"] ?? "stdio";
+    var httpUrl       = prelimConfig[$"{McpOptions.SectionName}:HttpUrl"] ?? "http://localhost:5100";
 
-    // Configurazione tipizzata
-    builder.Services
-        .AddOptions<DatabaseOptions>()
-        .BindConfiguration(DatabaseOptions.SectionName)
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
+    IHost app;
 
-    builder.Services
-        .AddOptions<McpOptions>()
-        .BindConfiguration(McpOptions.SectionName);
-
-    builder.Services
-        .AddOptions<OllamaOptions>()
-        .BindConfiguration(OllamaOptions.SectionName);
-
-    builder.Services.AddSingleton<OllamaStartupChecker>();
-
-    // Repository
-    builder.Services.AddSingleton<IQueryRepository, SqlQueryRepository>();
-
-    // MCP Server — trasporto stdio (compatibile Claude Desktop)
-    builder.Services
-        .AddMcpServer()
-        .WithHttpTransport()
-        .WithToolsFromAssembly()
-        .WithResourcesFromAssembly();
-
-    var app = builder.Build();
-
-    app.MapMcp("/mcp").AllowAnonymous();
-    app.MapGet("/healthz", () => "MetronomoMCP OK").AllowAnonymous();
-
-    app.Lifetime.ApplicationStarted.Register(() =>
+    if (transportMode == "stdio")
     {
-        foreach (var url in app.Urls)
+        // ── Generic host — nessuna porta HTTP aperta, compatibile Claude Desktop ──
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.Services.AddSerilog((_, cfg) =>
+            cfg.ReadFrom.Configuration(builder.Configuration));
+
+        ConfigureCommonServices(builder.Services);
+
+        builder.Services
+            .AddMcpServer()
+            .WithStdioServerTransport()
+            .WithToolsFromAssembly()
+            .WithResourcesFromAssembly()
+            .WithPromptsFromAssembly();
+
+        app = builder.Build();
+    }
+    else
+    {
+        // ── WebApplication — HTTP transport per OllamaChatter ─────────────────────
+        var builder = WebApplication.CreateBuilder(args);
+        builder.WebHost.UseUrls(httpUrl);
+
+        builder.Services.AddSerilog((_, cfg) =>
+            cfg.ReadFrom.Configuration(builder.Configuration));
+
+        ConfigureCommonServices(builder.Services);
+
+        builder.Services
+            .AddMcpServer()
+            .WithHttpTransport()
+            .WithToolsFromAssembly()
+            .WithResourcesFromAssembly()
+            .WithPromptsFromAssembly();
+
+        var webApp = builder.Build();
+
+        webApp.MapMcp("/mcp").AllowAnonymous();
+        webApp.MapGet("/healthz", () => "MetronomoMCP OK").AllowAnonymous();
+
+        webApp.Lifetime.ApplicationStarted.Register(() =>
         {
-            Log.Information("MetronomoMCP in ascolto su {Url}/mcp", url);
-            Log.Information("Diagnostica disponibile su {Url}/healthz", url);
-        }
-    });
+            foreach (var url in webApp.Urls)
+            {
+                Log.Information("MetronomoMCP in ascolto su {Url}/mcp", url);
+                Log.Information("Diagnostica disponibile su {Url}/healthz", url);
+            }
+        });
+
+        app = webApp;
+    }
+
+    // ── Avvio comune ──────────────────────────────────────────────────────────────
 
     // Verifica Ollama (se abilitato)
     await app.Services.GetRequiredService<OllamaStartupChecker>().CheckAsync();
 
     // Test connessione database all'avvio
     var dbOptions = app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-    var logger = app.Services.GetRequiredService<ILogger<SqlQueryRepository>>();
+    var logger    = app.Services.GetRequiredService<ILogger<SqlQueryRepository>>();
     try
     {
         await using var conn = new SqlConnection(dbOptions.ConnectionString);
@@ -104,3 +124,24 @@ finally
 }
 
 return 0;
+
+// ── Registrazione servizi comuni a entrambi i transport ───────────────────────
+void ConfigureCommonServices(IServiceCollection services)
+{
+    services
+        .AddOptions<DatabaseOptions>()
+        .BindConfiguration(DatabaseOptions.SectionName)
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
+    services
+        .AddOptions<McpOptions>()
+        .BindConfiguration(McpOptions.SectionName);
+
+    services
+        .AddOptions<OllamaOptions>()
+        .BindConfiguration(OllamaOptions.SectionName);
+
+    services.AddSingleton<OllamaStartupChecker>();
+    services.AddSingleton<IQueryRepository, SqlQueryRepository>();
+}

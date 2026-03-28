@@ -1,22 +1,45 @@
-# Contesto Business — Database MM_PR_*
+# Contesto Business — Database MM*PR*\*
+
+## Istruzioni Comportamentali
+
+Segui sempre queste regole senza eccezioni:
+
+- **OBBLIGO ASSOLUTO — chiama sempre i tool**: per qualsiasi risposta che coinvolga dati reali (numeri, nomi, date,
+  conteggi, elenchi, statistiche) devi chiamare il tool `execute_query` PRIMA di rispondere. Non esiste eccezione.
+  Il contesto fornito descrive SOLO la struttura del database; non contiene dati reali e non può essere usato come
+  fonte di risposta. Le query di esempio servono solo come riferimento per costruire la SQL, non come risposta.
+- **Non rispondere mai senza aver eseguito una query**: se non hai ancora chiamato `execute_query` e la domanda
+  richiede dati dal database, chiamalo adesso. Non stimare, non dedurre, non usare valori dal contesto.
+- **Rispondi SEMPRE in italiano**, anche se la domanda è in un'altra lingua.
+- **Sii conciso e diretto**: fornisci solo i dati richiesti, senza introduzioni, spiegazioni non richieste o commenti
+  finali.
+- **Non inventare dati**: se un tool non restituisce risultati, di' semplicemente "Nessun risultato trovato."
+- **Non descrivere cosa stai per fare**: esegui direttamente l'azione e mostra il risultato.
+- **Formato risposte**: per elenchi usa tabelle markdown; per singoli valori rispondi in una riga.
+- **Se non trovi un dato**, non speculare: di' che non è presente nel database.
+- **Non ripetere la domanda** nella risposta.
+
+---
 
 ## Sistema
 
-**Mecmatica** è un ERP italiano per la gestione della produzione manifatturiera (make-to-order / make-to-stock). Il database esposto tramite MetronomoMCP è un database di produzione aziendale su **SQL Server**, il cui nome inizia sempre con il prefisso `MM_PR_`.
-
-Il database contiene centinaia di tabelle raggruppabili in moduli funzionali distinti.
+**Metronomo.Net** è un ERP italiano per la gestione della produzione manifatturiera (make-to-order / make-to-stock). Il
+database esposto tramite MetronomoMCP è un database di produzione aziendale su **SQL Server**, il cui nome inizia sempre
+con il prefisso `MM_PR_`. **Mecmatica** è il nome della software house che ha sviluppato il gestionale, non un fornitore
+in anagrafica
 
 ---
 
 ## Convenzioni di Naming
 
-- Le chiavi primarie sono sempre `ID<NomeTabella>` (es. `IDArticolo`, `IDCommessa`, `IDContatto`)
+- Le chiavi primarie sono `ID<NomeTabella>` (es. `IDArticolo`, `IDCommessa`, `IDContatto`) oppure semplicemente ID
 - I campi booleani iniziano con `b` (es. `bCliente`, `bFornitore`) oppure sono di tipo `bit`
 - I campi di testo descrittivo sono spesso `nvarchar` (supporto Unicode/multilingua)
 - I codici umani (codice articolo, codice contatto) sono campi `char` fissi
 - Molte tabelle hanno una versione `_DETTAGLIO` (righe) collegata alla testata principale
 - Le tabelle `*_EXTRA` contengono campi aggiuntivi opzionali
 - Le tabelle `*_OLD` e `*_HISTORY` contengono dati storici/archiviati
+- I record disattivati sono identificati con i campi di tipo 'bit' denominati 'Old' o 'Disattivo' o 'Disattiva'
 
 ---
 
@@ -28,22 +51,23 @@ Tabella centrale per tutti i prodotti/semilavorati/materie prime.
 
 **Tabella principale:** `ARTICOLI`
 
-| Campo | Significato |
-|---|---|
-| `IDArticolo` | PK intera |
-| `Articolo` | Codice articolo (char, univoco) |
-| `Descrizione` | Descrizione articolo |
-| `IDCliente` | Cliente proprietario (se conto-lavoro) |
-| `Tipo` | Tipo articolo |
-| `Categoria` | Categoria merceologica |
-| `UM` | Unità di misura |
-| `LPezzo` | Lunghezza pezzo (produzione da barra) |
-| `PesoPezzo` | Peso unitario |
-| `IDMateriale` | Materiale (per articoli da barra/foglio) |
-| `PurchaseType` | 0=produzione interna, 1=acquisto, 2=misto |
-| `PrezzoAcquistoMedio` | Prezzo medio di acquisto |
+| Campo                 | Significato                               |
+| --------------------- | ----------------------------------------- |
+| `IDArticolo`          | PK intera                                 |
+| `Articolo`            | Codice articolo (char, univoco)           |
+| `Descrizione`         | Descrizione articolo                      |
+| `IDCliente`           | Cliente proprietario (se conto-lavoro)    |
+| `Tipo`                | Tipo articolo                             |
+| `Categoria`           | Categoria merceologica                    |
+| `UM`                  | Unità di misura                           |
+| `LPezzo`              | Lunghezza pezzo (produzione da barra)     |
+| `PesoPezzo`           | Peso unitario                             |
+| `IDMateriale`         | Materiale (per articoli da barra/foglio)  |
+| `PurchaseType`        | 0=produzione interna, 1=acquisto, 2=misto |
+| `PrezzoAcquistoMedio` | Prezzo medio di acquisto                  |
 
 **Tabelle correlate:**
+
 - `ARTICOLI_FASI` — ciclo di lavorazione dell'articolo (fasi produttive)
 - `ARTICOLI_COMPOSIZIONE` — distinta base (componenti)
 - `ARTICOLI_FORNITORI` — fornitori qualificati per l'articolo
@@ -63,33 +87,38 @@ Le commesse sono gli ordini di produzione interni. Ogni commessa produce un arti
 
 **Tabella principale:** `COMMESSE`
 
-| Campo | Significato |
-|---|---|
-| `IDCommessa` | PK intera |
-| `Commessa` | Codice commessa (char) |
-| `IDArticolo` | Articolo da produrre |
-| `IDClienteCommessa` | Cliente di riferimento |
-| `Data` | Data creazione |
-| `DataConsegna` | Data consegna prevista |
-| `DataChiusura` | Data chiusura effettiva |
-| `PezziTotale` | Quantità totale da produrre |
-| `PezziProdotti` | Quantità già prodotta |
-| `PezziVersati` | Quantità versata a magazzino |
-| `PezziScartati` | Quantità scartata |
-| `Completata` | Flag commessa completata |
-| `CommessaStatus` | Stato della commessa |
-| `Urgente` | Flag urgenza |
-| `IDOrdine` | Ordine cliente collegato |
+| Campo               | Significato                                   |
+| ------------------- | --------------------------------------------- |
+| `IDCommessa`        | PK intera                                     |
+| `Commessa`          | Codice commessa (char)                        |
+| `IDArticolo`        | Articolo da produrre                          |
+| `IDClienteCommessa` | Cliente di riferimento                        |
+| `Data`              | Data creazione                                |
+| `DataConsegna`      | Data consegna prevista                        |
+| `DataChiusura`      | Data chiusura effettiva                       |
+| `PezziTotale`       | Quantità totale da produrre                   |
+| `PezziProdotti`     | Quantità già prodotta                         |
+| `PezziVersati`      | Quantità versata a magazzino                  |
+| `PezziScartati`     | Quantità scartata                             |
+| `Completata`        | Flag commessa completata (0=aperta, 1=chiusa) |
+| `CommessaStatus`    | Stato della commessa                          |
+| `Urgente`           | Flag urgenza                                  |
+| `IDOrdine`          | Ordine cliente collegato                      |
 
 **Tabelle correlate:**
-- `COMMESSE_COMPONENTI` — materiali impegnati nella commessa
-- `COMMESSE_FABBISOGNO` — fabbisogno materiali (MRP)
+
+- `COMMESSE_FABBISOGNO` — materiali necessari (fabbisogno MRP)
+- `COMMESSE_COMPONENTI` — gerarchia sottocommesse (distinta base esplosa)
+- `COMMESSE_IMPEGNI` — impegni verso ordini cliente
 - `COMMESSE_ORE` — ore di lavoro registrate
 - `COMMESSE_COSTI` — costi effettivi commessa
-- `COMMESSE_IMPEGNI` — impegni di magazzino
 - `COMMESSE_MATRICOLE` — matricole prodotte
 - `COMMESSE_STATUS` — storico stati commessa
 - `COMMESSE_TRACKING` — tracciabilità avanzamento
+
+**ODL e sequenza di lavorazione:** La tabella `ODL` rappresenta la sequenza logica delle lavorazioni per una commessa.
+Ogni ODL = un'operazione su una macchina specifica. Il ciclo completo di un articolo è la sequenza ordinata delle sue
+`ARTICOLI_FASI`, ognuna delle quali genera un `CRP_ODL` quando la commessa viene pianificata.
 
 ---
 
@@ -99,49 +128,49 @@ Unica anagrafica per clienti, fornitori e vettori. Il ruolo è determinato da fl
 
 **Tabella principale:** `CONTATTI`
 
-| Campo | Significato |
-|---|---|
-| `IDContatto` | PK intera |
-| `Codice` | Codice contatto (char) |
-| `Descrizione` | Ragione sociale |
-| `bCliente` | È un cliente |
-| `bFornitore` | È un fornitore |
-| `bVettore` | È un vettore/spedizioniere |
-| `PartitaIVA` | P.IVA |
-| `CF` | Codice fiscale |
-| `CodiceSdi` | Codice SDI fatturazione elettronica |
-| `Divisa` | Valuta di default |
-| `IDPagamentoCredito` | Condizioni di pagamento |
-| `ClientePotenziale` | Flag cliente prospect |
-| `FornitoreQualificato` | Livello qualifica fornitore |
+| Campo                  | Significato                         |
+| ---------------------- | ----------------------------------- |
+| `IDContatto`           | PK intera                           |
+| `Codice`               | Codice contatto (char)              |
+| `Descrizione`          | Ragione sociale                     |
+| `bCliente`             | 1 = è un cliente                    |
+| `bFornitore`           | 1 = è un fornitore                  |
+| `bVettore`             | 1 = è un vettore/spedizioniere      |
+| `PartitaIVA`           | P.IVA                               |
+| `CF`                   | Codice fiscale                      |
+| `CodiceSdi`            | Codice SDI fatturazione elettronica |
+| `Divisa`               | Valuta di default                   |
+| `IDPagamentoCredito`   | Condizioni di pagamento             |
+| `ClientePotenziale`    | Flag cliente prospect               |
+| `FornitoreQualificato` | Livello qualifica fornitore         |
+| `Provincia`            | Provincia (sigla, es. 'AN', 'PU')   |
+| `Città`                | Città                               |
 
 **Tabelle correlate:**
-- `CONTATTI_INDIRIZZI` — indirizzi multipli (spedizione, fatturazione, ecc.)
+
+- `CONTATTI_INDIRIZZI` — indirizzi multipli
 - `CONTATTI_CATEGORIE` — categorizzazione contatti
-- `CONTATTI_DOCUMENTI` — documenti allegati al contatto
+- `CONTATTI_DOCUMENTI` — documenti allegati
 - `CONTATTI_ATTRIBUTI_VALORI` — attributi personalizzati
 
 ---
 
 ### 4. Ordini Clienti — `ORDINI_CLIENTI` / `ORDINI`
 
-Gestione degli ordini ricevuti dai clienti.
+**Tabella testata:** `ORDINI_CLIENTI` — l'ordine cliente **Tabella righe:** `ORDINI` — le righe dell'ordine (un articolo
+per riga)
 
-**Tabella testata:** `ORDINI_CLIENTI` — l'ordine cliente (testata)
-**Tabella righe:** `ORDINI` — le righe dell'ordine (un articolo per riga)
-
-| Campo (ORDINI) | Significato |
-|---|---|
-| `IDOrdine` | Codice riga ordine |
-| `IDOrdineCliente` | Ordine cliente di appartenenza |
-| `IDArticolo` | Articolo ordinato |
-| `IDCliente` | Cliente |
-| `DataConsegna` | Data consegna richiesta |
-| `PezziTotale` | Quantità ordinata |
-| `PezziConsegnati` | Quantità già consegnata |
-| `PezziProdotti` | Quantità prodotta |
-| `OrdineStatus` | Stato riga (aperta, chiusa, ecc.) |
-| `IDCommessa` (via join) | Commessa di produzione associata |
+| Campo (ORDINI)    | Significato                       |
+| ----------------- | --------------------------------- |
+| `IDOrdine`        | Codice riga ordine                |
+| `IDOrdineCliente` | Ordine cliente di appartenenza    |
+| `IDArticolo`      | Articolo ordinato                 |
+| `IDCliente`       | Cliente                           |
+| `DataConsegna`    | Data consegna richiesta           |
+| `PezziTotale`     | Quantità ordinata                 |
+| `PezziConsegnati` | Quantità già consegnata           |
+| `PezziProdotti`   | Quantità prodotta                 |
+| `OrdineStatus`    | Stato riga (aperta, chiusa, ecc.) |
 
 ---
 
@@ -152,22 +181,20 @@ Gestione degli ordini ricevuti dai clienti.
 - `FATTURE_DETTAGLIO` / `FATTURE_FORNITORI_DETTAGLIO` — righe delle fatture
 - `FATTURE_ELETTRONICHE` — fatture XML per SDI (B2B/PA)
 
-| Campo (FATTURE) | Significato |
-|---|---|
-| `IDFattura` | Codice fattura |
-| `IDCliente` | Cliente fatturato |
-| `Data` | Data fattura |
-| `Imponibile` | Imponibile totale |
-| `Iva` | IVA totale |
-| `Totale` | Totale fattura |
-| `IsVendita` | True=fattura di vendita |
-| `IDPagamento` | Condizioni di pagamento |
+| Campo (FATTURE) | Significato             |
+| --------------- | ----------------------- |
+| `IDFattura`     | Codice fattura          |
+| `IDCliente`     | Cliente fatturato       |
+| `Data`          | Data fattura            |
+| `Imponibile`    | Imponibile totale       |
+| `Iva`           | IVA totale              |
+| `Totale`        | Totale fattura          |
+| `IsVendita`     | 1=fattura di vendita    |
+| `IDPagamento`   | Condizioni di pagamento |
 
 ---
 
 ### 6. DDT (Documenti di Trasporto) — `DDT`
-
-Bolle di consegna/trasporto ai clienti.
 
 - `DDT` — testata DDT
 - `DDT_DETTAGLIO` — righe DDT
@@ -179,19 +206,17 @@ Bolle di consegna/trasporto ai clienti.
 
 Le fasi sono le operazioni produttive (tornio, fresatura, controllo, ecc.).
 
-**Tabella principale:** `FASI`
-
-| Campo | Significato |
-|---|---|
-| `ID` | PK |
-| `DescFase` | Codice fase |
-| `Descrizione` | Descrizione operazione |
-| `OutSource` | Lavorazione esterna (conto terzi) |
-| `Macchina` | Macchina di default |
-| `TempoFase` | Tempo ciclo standard |
-| `TempoSetUp` | Tempo attrezzaggio |
-| `FaseCostoOrario` | Costo orario macchina |
-| `FaseCostoOrarioUomo` | Costo orario operatore |
+| Campo                 | Significato                       |
+| --------------------- | --------------------------------- |
+| `ID`                  | PK                                |
+| `DescFase`            | Codice fase                       |
+| `Descrizione`         | Descrizione operazione            |
+| `OutSource`           | Lavorazione esterna (conto terzi) |
+| `Macchina`            | Macchina di default               |
+| `TempoFase`           | Tempo ciclo standard              |
+| `TempoSetUp`          | Tempo attrezzaggio                |
+| `FaseCostoOrario`     | Costo orario macchina             |
+| `FaseCostoOrarioUomo` | Costo orario operatore            |
 
 ---
 
@@ -199,38 +224,39 @@ Le fasi sono le operazioni produttive (tornio, fresatura, controllo, ecc.).
 
 Parco macchine produttivo con monitoraggio real-time.
 
-| Campo | Significato |
-|---|---|
-| `IDMacchina` | PK |
-| `Macchina` | Codice macchina |
-| `Descrizione` | Nome macchina |
-| `Reparto` | Reparto di appartenenza |
-| `Fermo` | Stato fermo (tipo fermo attuale) |
-| `AperturaTurno` | Inizio turno corrente |
-| `PezziTotale` | Pezzi prodotti totali |
+| Campo           | Significato                                          |
+| --------------- | ---------------------------------------------------- |
+| `IDMacchina`    | PK                                                   |
+| `Macchina`      | Codice macchina                                      |
+| `Descrizione`   | Nome macchina                                        |
+| `Reparto`       | Reparto di appartenenza                              |
+| `Modello`       | Modello macchina (char, FK verso `MACCHINE_MODELLI`) |
+| `Fermo`         | Stato fermo (tipo fermo attuale)                     |
+| `AperturaTurno` | Inizio turno corrente                                |
+| `PezziTotale`   | Pezzi prodotti totali                                |
+| `Old`           | 1 = macchina dismessa/obsoleta                       |
 
 **Tabelle correlate:**
+
 - `MACCHINE_REPARTI` — raggruppamento per reparto
 - `MACCHINE_ORARIO` — orari/turni macchina
 - `MACCHINE_CONTATORI` — contatori di produzione
 - `MACCHINE_LOG_ALLARMI` — log allarmi macchina
-- `MACCHINE_MODELLI` — modelli macchina (template)
+- `MACCHINE_MODELLI` — modelli macchina (colonna chiave: `Modello`, descrizione in `Descrizione`)
 - `FERMI_MACCHINA` — storico fermi macchina
 
 ---
 
-### 9. ODL (Ordini Di Lavoro) — `CRP_ODL`
+### 9. ODL (Ordini Di Lavoro) — `ODL`
 
-Gli ODL sono le sessioni di lavoro su macchina per una commessa.
-
-| Campo | Significato |
-|---|---|
-| `IDMacchina` | Macchina assegnata |
-| `IDCommessa` | Commessa di riferimento |
-| `DataApertura` | Inizio lavorazione |
-| `DataChiusura` | Fine lavorazione |
-| `PezziProdotti` | Pezzi realizzati |
-| `PezziScartati` | Pezzi scartati |
+| Campo           | Significato             |
+| --------------- | ----------------------- |
+| `Macchina`      | Macchina assegnata      |
+| `Commessa`      | Commessa di riferimento |
+| `DataApertura`  | Inizio lavorazione      |
+| `DataChiusura`  | Fine lavorazione        |
+| `PezziProdotti` | Pezzi realizzati        |
+| `PezziScartati` | Pezzi scartati          |
 
 ---
 
@@ -245,16 +271,12 @@ Gli ODL sono le sessioni di lavoro su macchina per una commessa.
 
 ### 11. Offerte/Preventivi — `OFFERTE`
 
-Gestione commerciale offerte ai clienti.
-
 - `OFFERTE` — testata offerta (con revisioni)
 - `OFFERTE_DETTAGLIO` — righe offerta
 
 ---
 
 ### 12. Manutenzione — `MANU_*`
-
-Modulo CMMS (manutenzione macchine e impianti).
 
 - `MANU_IMPIANTI` — impianti soggetti a manutenzione
 - `MANU_INTERVENTI` — interventi manutentivi
@@ -265,8 +287,6 @@ Modulo CMMS (manutenzione macchine e impianti).
 ---
 
 ### 13. Energia — `ENERGY_*`
-
-Monitoraggio consumi energetici per macchina e ODL.
 
 - `ENERGY_SLOT` — slot di misurazione energetica
 - `ENERGY_SLOT_ODL` — energia consumata per ODL
@@ -295,8 +315,6 @@ Monitoraggio consumi energetici per macchina e ODL.
 ---
 
 ### 16. Formazione — `FORM_*`
-
-Gestione competenze e formazione del personale.
 
 - `FORM_OPERATORI` — operatori/dipendenti
 - `FORM_MANSIONI` — mansioni e competenze richieste
@@ -333,7 +351,45 @@ COMMESSE → DDT → FATTURE
 
 ## Query di Esempio Frequenti
 
+### Conteggio clienti
+
+```sql
+SELECT COUNT(*) AS numero_clienti FROM CONTATTI WHERE bCliente = 1
+```
+
+### Clienti per provincia
+
+```sql
+SELECT ISNULL(Provincia, '(non specificata)') AS Provincia,
+       COUNT(*) AS NumeroClienti
+FROM CONTATTI WHERE bCliente = 1
+GROUP BY Provincia ORDER BY NumeroClienti DESC
+```
+
+### Elenco fornitori
+
+```sql
+SELECT Codice, Descrizione, Città, Provincia, PartitaIVA
+FROM CONTATTI WHERE bFornitore = 1
+ORDER BY Descrizione
+```
+
+### Conteggio articoli in anagrafica
+
+```sql
+SELECT COUNT(*) AS numero_articoli FROM ARTICOLI
+```
+
+### Ricerca articolo per codice o descrizione
+
+```sql
+SELECT TOP 20 Articolo, Descrizione, Categoria, UM, PurchaseType
+FROM ARTICOLI
+WHERE Descrizione LIKE '%testo%' OR Articolo LIKE '%testo%'
+```
+
 ### Commesse aperte per cliente
+
 ```sql
 SELECT c.Commessa, a.Articolo, a.Descrizione,
        c.PezziTotale, c.PezziProdotti, c.DataConsegna,
@@ -341,11 +397,25 @@ SELECT c.Commessa, a.Articolo, a.Descrizione,
 FROM COMMESSE c
 JOIN ARTICOLI a ON c.IDArticolo = a.IDArticolo
 JOIN CONTATTI co ON c.IDClienteCommessa = co.IDContatto
-WHERE c.Completata = 0
+WHERE c.Completata = 0 and c.Verificare = 0
+ORDER BY c.DataConsegna
+```
+
+### Commesse aperte urgenti
+
+```sql
+SELECT c.Commessa, a.Descrizione AS Articolo,
+       co.Descrizione AS Cliente, c.DataConsegna,
+       c.PezziTotale, c.PezziProdotti
+FROM COMMESSE c
+JOIN ARTICOLI a ON c.IDArticolo = a.IDArticolo
+JOIN CONTATTI co ON c.IDClienteCommessa = co.IDContatto
+WHERE c.Completata = 0 AND c.Urgente = 1
 ORDER BY c.DataConsegna
 ```
 
 ### Giacenze a magazzino
+
 ```sql
 SELECT a.Articolo, a.Descrizione, d.Deposito,
        mad.Giacenza, mad.Impegnato, mad.Disponibile
@@ -356,19 +426,20 @@ WHERE mad.Giacenza > 0
 ```
 
 ### Fatturato per cliente nell'anno corrente
+
 ```sql
 SELECT co.Descrizione AS Cliente,
        SUM(f.Imponibile) AS Imponibile,
        SUM(f.Totale) AS Totale
 FROM FATTURE f
 JOIN CONTATTI co ON f.IDCliente = co.IDContatto
-WHERE YEAR(f.Data) = YEAR(GETDATE())
-  AND f.IsVendita = 1
+WHERE YEAR(f.Data) = YEAR(GETDATE()) AND f.IsVendita = 1
 GROUP BY co.IDContatto, co.Descrizione
 ORDER BY SUM(f.Totale) DESC
 ```
 
 ### Produzione giornaliera per macchina
+
 ```sql
 SELECT m.Macchina, m.Descrizione,
        SUM(o.PezziProdotti) AS PezziOggi
@@ -379,11 +450,50 @@ GROUP BY m.IDMacchina, m.Macchina, m.Descrizione
 ORDER BY PezziOggi DESC
 ```
 
+### Macchine per modello (escludendo obsolete)
+
+```sql
+SELECT mm.Descrizione AS Modello, COUNT(*) AS NumeroMacchine
+FROM MACCHINE m
+LEFT JOIN MACCHINE_MODELLI mm ON m.Modello = mm.Modello
+WHERE m.Modello != 'ZZ-OBSOLETI'
+GROUP BY m.Modello, mm.Descrizione
+ORDER BY NumeroMacchine DESC
+```
+
+### ODL aperti (in lavorazione)
+
+```sql
+SELECT o.IDOdl, m.Macchina, m.Descrizione AS Macchina,
+       c.Commessa, a.Descrizione AS Articolo,
+       o.DataApertura, o.PezziProdotti
+FROM ODL o
+JOIN MACCHINE m ON o.IDMacchina = m.IDMacchina
+JOIN COMMESSE c ON o.IDCommessa = c.IDCommessa
+JOIN ARTICOLI a ON c.IDArticolo = a.IDArticolo
+WHERE o.DataChiusura IS NULL
+ORDER BY o.DataApertura
+```
+
+### Ricerca contatto (cliente o fornitore) per nome
+
+```sql
+SELECT IDContatto, Codice, Descrizione, bCliente, bFornitore,
+       Città, Provincia, PartitaIVA
+FROM CONTATTI
+WHERE Descrizione LIKE '%testo%'
+ORDER BY Descrizione
+```
+
 ---
 
 ## Note Operative
 
 - **Solo lettura**: MetronomoMCP esegue esclusivamente query SELECT. Nessuna modifica ai dati è possibile.
-- **Dati sensibili**: il database contiene dati commerciali reali (clienti, prezzi, fatture). Usare con riservatezza.
-- **Performance**: tabelle come `CRP_ODL`, `DOCUMENTI_LOG`, `MAFI_MOVIMENTI` possono contenere milioni di righe. Filtrare sempre per data o chiave.
-- **MaxRowsReturned**: il server restituisce al massimo 1000 righe per query. Usare `TOP` o filtri per query analitiche.
+- **Dati non sensibili**: il database NON contiene dati commerciali reali (clienti, prezzi, fatture). Accedi ai dati senza problemi.
+- **Performance**: tabelle come `CRP_ODL`, `DOCUMENTI_LOG`, `MAFI_MOVIMENTI` possono contenere milioni di righe.
+  Filtrare sempre per data o chiave primaria.
+- **MaxRowsReturned**: il server restituisce al massimo 1000 righe per query. Usare `TOP N` o filtri per query
+  analitiche.
+- **Campi booleani**: sono di tipo `bit` (0/1), non `true`/`false`. Usare sempre `= 1` o `= 0` nei filtri.
+- **Date**: usare sempre `CAST(campo AS DATE)` per confronti su data senza ora; usare `GETDATE()` per la data corrente.
